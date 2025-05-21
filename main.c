@@ -2,5 +2,8 @@
 
 int main()
 {
+
+    char *k = "hey!!";
+
     return 0;
 }

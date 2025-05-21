@@ -11,6 +11,9 @@ class TokenType
     const CLOSE_ANGLE_BRACKET = 'CLOSE_ANGLE_BRACKET';
     const DOT = 'DOT';
     const SEMICOLON = 'SEMICOLON';
+    const DOUBLE_QUOTATION_MARK = '"';
+    const SINGLE_QUOTATION_MARK = '\'';
+    const STAR_OPERATOR = '*';
 }
 
 class Token
@@ -35,7 +38,7 @@ class Lexer
 
     public function __construct($source)
     {
-        $this->tokens = [];
+        $this->tokens = array_unique([]);
         $this->source = $source;
     }
 
@@ -78,19 +81,17 @@ class Lexer
 
                 $pos = $next;
                 $this->tokens[] = new Token(TokenType::IDENT, $ident, $pos);
-            }
-
-            if (ctype_alnum($tok)) {
+            } else if (ctype_alnum($tok)) {
                 $numerical .= $tok;
                 $next = $pos + 1;
+
+                while ($this->next_slot_open($src, $pos) && ctype_space($src[$next])) $next++;
 
                 while ($this->next_slot_open($src, $next) && ctype_alnum($src[$next])) {
                     $nexttok = $src[$next];
                     $numerical .= $nexttok;
                     $next++;
                 }
-
-
                 $pos = $next;
                 $this->tokens[] = new Token(TokenType::NUMERICAL, $numerical, $pos);
             }
@@ -117,7 +118,17 @@ class Lexer
                 case ';':
                     $this->tokens[] = new Token(TokenType::SEMICOLON, ';', $pos);
                     break;
+                case '\'':
+                    $this->tokens[] = new Token(TokenType::SINGLE_QUOTATION_MARK, '\'', $pos);
+                    break;
+                case '"':
+                    $this->tokens[] = new Token(TokenType::DOUBLE_QUOTATION_MARK, '"', $pos);
+                    break;
+                case '*':
+                    $this->tokens[] = new Token(TokenType::STAR_OPERATOR, '*', $pos);
+                    break;
                 default:
+                    fprintf(STDERR, "Unknown tok (" . $tok . ")\n");
                     break;
             }
             $pos++;
@@ -126,6 +137,23 @@ class Lexer
     }
 }
 
-$lex = new Lexer("12 1221");
-$t = $lex->tokenize();
-print_r($t);
+
+function entrypt($name, $echoOut)
+{
+    $f = fopen($name, "r") or die("File not found.");
+    $lineNo = 1;
+    $t_arr_arr = null;
+
+    while (($line = fgets($f)) !== false) {
+        $lexer = new Lexer($line);
+        $tokenized = $lexer->tokenize();
+        $t_arr_arr[] = $tokenized;
+        $lineNo++;
+        echo ($line);
+    }
+
+    print_r($t_arr_arr);
+    fclose($f);
+}
+
+entrypt("main.c", false);
