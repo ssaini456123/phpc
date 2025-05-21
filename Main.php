@@ -10,6 +10,7 @@ class TokenType
     const OPEN_ANGLE_BRACKET = 'OPEN_ANGLE_BRACKET';
     const CLOSE_ANGLE_BRACKET = 'CLOSE_ANGLE_BRACKET';
     const DOT = 'DOT';
+    const SEMICOLON = 'SEMICOLON';
 }
 
 class Token
@@ -58,52 +59,40 @@ class Lexer
         $tok = null;
 
         while ($pos < $srcLen) {
+
             $tok = $src[$pos];
-            $ident = null;
-            $numerical = null;
+            $ident = "";
+            $numerical = "";
 
             if (ctype_alpha($tok)) {
+                $ident .= $tok;
                 $next = $pos + 1;
 
-                while (
-                    $this->next_slot_open($src, $pos)
-                    && ctype_alpha($src[$next])
-                ) {
-                    $ident .= $src[$next];
+                while ($this->next_slot_open($src, $pos) && ctype_space($src[$next])) $next++;
+
+                while ($this->next_slot_open($src, $next) && ctype_alpha($src[$next])) {
+                    $nexttok = $src[$next];
+                    $ident .= $nexttok;
                     $next++;
                 }
 
                 $pos = $next;
-                continue;
+                $this->tokens[] = new Token(TokenType::IDENT, $ident, $pos);
             }
 
-            if (is_numeric($tok)) {
+            if (ctype_alnum($tok)) {
+                $numerical .= $tok;
                 $next = $pos + 1;
-                // alr cuh maybe its a numerical constant
-                //wefwefwefwef
-                // dude fuck phpefw efefwe7 holy FUCK
-                //array_key_firwst'[swe;fw
-                //fwfef[wefswefefwefw
-                while (
-                    $this->next_slot_open($src, $pos)
-                    && ctype_alnum($next)
-                ) {
-                    $numerical .= $src[$next];
+
+                while ($this->next_slot_open($src, $next) && ctype_alnum($src[$next])) {
+                    $nexttok = $src[$next];
+                    $numerical .= $nexttok;
                     $next++;
                 }
 
-                $pos = $next;
-                continue;
-            }
 
-
-
-            if ($ident != null) {
-                $this->tokens[] = new Token(TokenType::IDENT, $ident, $pos);
                 $pos = $next;
-            } elseif ($numerical != null) {
-                $this->tokens[] = new Token(TokenType::IDENT, $ident, $pos);
-                $pos = $next;
+                $this->tokens[] = new Token(TokenType::NUMERICAL, $numerical, $pos);
             }
 
             switch ($tok) {
@@ -125,17 +114,18 @@ class Lexer
                 case '.':
                     $this->tokens[] = new Token(TokenType::DOT, '.', $pos);
                     break;
+                case ';':
+                    $this->tokens[] = new Token(TokenType::SEMICOLON, ';', $pos);
+                    break;
                 default:
                     break;
             }
-
             $pos++;
         }
-
         return $this->tokens;
     }
 }
 
-$lex = new Lexer("#include <stdio.h>");
+$lex = new Lexer("12 1221");
 $t = $lex->tokenize();
 print_r($t);
