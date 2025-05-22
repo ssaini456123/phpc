@@ -3,27 +3,11 @@
 function entrypt($name, $echoOut)
 {
     $f = fopen($name, "r") or die("File not found.");
-
-
-    $f2 = fopen("LEXERFILE.txt", "w+");
-    fflush($f2);
-
-    $lineNo = 1;
-    $t_arr_arr = null;
-
-    while (($line = fgets($f)) !== false) {
-        $lexer = new Lexer($line);
-        $tokenized = $lexer->tokenize($lineNo);
-        $t_arr_arr[] = $tokenized;
-        $lineNo++;
-    }
-
-    $p = new Parser($t_arr_arr);
-    $tt = print_r($p->parseTokens(),true);
-    fwrite($f2, $tt);
-
-    fclose($f2);
-    fclose($f);
+    $src = file_get_contents($name);
+    $lex = new Lexer($src);
+    $tarr = $lex->tokenize();
+    $p = new Parser($tarr);
+    $p->parseTokens();
 }
 
 entrypt("main.c", false);
@@ -50,7 +34,6 @@ class TokenType
     const STRING_LIT = 'STRING_LIT';
 
     //sigh
-
     const BOOL_TYPE = 'BOOL_TYPE';
     const CHAR_TYPE = 'CHAR_TYPE';
     const INT_TYPE = 'INT_TYPE';
@@ -62,6 +45,9 @@ class TokenType
     const INT_PTR_TYPE = 'INT_PTR_TYPE';
     const LONG_PTR_TYPE = 'LONG_PTR_TYPE';
     const FLOAT_PTR_TYPE = 'FLOAT_PTR_TYPE';
+    const DOUBLE_PTR_TYPE = 'DOUBLE_PTR_TYPE';
+    const VOID_PTR = 'VOID_PTR';
+    const NATIVE_C_TY = ['bool','int','char','long','double','float'];
 }
 
 class Token
@@ -103,6 +89,8 @@ class Token
 class Lexer
 {
     private $pos = 0;
+    private $lineNo = 1;
+
     private $source;
     private $tokens;
 
@@ -123,8 +111,53 @@ class Lexer
         }
     }
 
-    public function tokenize($lineNo)
+    public function match_c_ty($ident)
     {
+        // format: bool, str|null, TokenType|null
+        $r = [];
+
+
+        $native_c_ty = in_array($ident, TokenType::NATIVE_C_TY);
+        $ty_str = null;
+        $tt = null;
+        
+        switch($ident) {
+            case 'bool':
+                $ty_str='bool';
+                $tt=TokenType::BOOL_TYPE;
+                break;
+            case 'int':
+                $ty_str='int';
+                $tt=TokenType::INT_TYPE;
+                break;
+            case 'char':
+                $ty_str='char';
+                $tt=TokenType::CHAR_TYPE;
+                break;
+            case 'long':
+                $ty_str='long';
+                $tt=TokenType::LONG_TYPE;
+                break;
+            case 'double':
+                $ty_str='double';
+                $tt=TokenType::DOUBLE_TYPE;
+                break;
+            case 'float':
+                $ty_str='float';
+                $tt=TokenType::FLOAT_TYPE;
+                break;
+        }
+
+        $r[0]=$native_c_ty;
+        $r[1]=$ty_str;
+        $r[2]=$tt;
+
+        return $r;
+    }
+
+    public function tokenize()
+    {
+        $lineNo = $this->lineNo;
         $pos = $this->pos;
         $src = $this->source;
         $srcLen = strlen($src);
@@ -179,8 +212,78 @@ class Lexer
                 }
 
                 $pos = $next;
+
+                // Is the ident a native c ty?
+                $ty_match = $this->match_c_ty($ident);
+                $c_ty = $ty_match[0];
+
+                
+                if($c_ty) {
+
+                    $frwrd=$next + 1;
+                    $ty_str = $ty_match[1];
+
+                    if($this->next_slot_open($src,$next))
+                    {
+                    /**
+                     * The lexer itself is rather brittle. We check for a 
+                     * ptr type by assuming the star char is glued to the type
+                     * immediately after
+                     * 
+                     * this completely names like: int *ptrName;
+                     * 
+                     * For the unfortunate people who use this, i am sorry. But i am not going to fix this.
+                     */
+
+                        $p_ptr = $src[$frwrd];
+
+                        if($p_ptr == '*') {
+
+                            $ty_str .= '*';
+                            //'char','long','double','float'
+                            switch($ty_str) {
+                                case 'bool*':
+                                    $this->tokens[] = new Token(TokenType::BOOL_PTR_TYPE, $ty_str, $pos,$lineNo);
+                                    break;
+
+                                case 'int*':
+                                    $this->tokens[] = new Token(TokenType::INT_PTR_TYPE, $ty_str, $pos, $lineNo);
+                                    break;
+
+                                case 'char*':
+                                    $this->tokens[] = new Token(TokenType::CHAR_PTR_TYPE, $ty_str, $pos, $lineNo);
+                                    break;
+                                
+                                case 'long*':
+                                    $this->tokens[] = new Token(TokenType::LONG_PTR_TYPE, $ty_str, $pos, $lineNo);
+                                    break;
+
+                                case 'double*':
+                                    $this->tokens[] = new Token(TokenType::DOUBLE_PTR_TYPE, $ty_str, $pos, $lineNo);
+                                    break;
+
+                                case 'float*':
+                                    $this->tokens[] = new Token(TokenType::FLOAT_PTR_TYPE, $ty_str, $pos, $lineNo);
+                                    break;
+                                default:
+                                    $this->tokens[] = new Token(TokenType::VOID_PTR, $ty_str, $pos, $lineNo);
+                                    break;
+                            }
+
+                            echo("(lex)Added pointer ty: " . $ty_str . PHP_EOL);
+                            continue;
+                        }
+                    }
+
+                    $tt = $ty_match[2];
+                    $this->tokens[] = new Token($tt, $ty_str,$pos,$lineNo);
+                    echo("(lex)Added Type: " . $ty_str . PHP_EOL);
+                    continue;
+                }
+                
                 $this->tokens[] = new Token(TokenType::IDENT, $ident, $pos, $lineNo);
                 continue;
+
             } else if (ctype_alnum($tok)) {
                 $numerical .= $tok;
                 $next = $pos + 1;
@@ -194,6 +297,12 @@ class Lexer
                 }
                 $pos = $next;
                 $this->tokens[] = new Token(TokenType::NUMERICAL, $numerical, $pos, $lineNo);
+                continue;
+            }
+
+            if($tok === "\n"){ // cant believe === even exists
+                $lineNo++;
+                $pos++;
                 continue;
             }
 
@@ -292,6 +401,9 @@ class ParserContext
 
 class Parser
 {
+    /**
+     * @var ParserContext
+     */
     private $pCtx;
 
     public function __construct($tok_arr)
@@ -311,23 +423,6 @@ class Parser
         $ctx = $this->getParserContext();
         $tokens_arr = $ctx->getTokens();
 
-        $inner_toks = [];
-        $i=0;
-        $arrsz = sizeof($tokens_arr);
-
-        for(; $i < $arrsz;$i++)
-        {
-            $curr_tok_arr = $tokens_arr[$i];
-
-            # Skip the blank lines
-            if(sizeof($curr_tok_arr) == 0) {
-                continue;
-            }
-
-            $inner_toks[] = $ctx->getTokens()[$i];
-        }
-
-
-        return $inner_toks; //?????
+        print_r($tokens_arr);
     }
 }

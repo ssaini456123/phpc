@@ -1,10 +1,7 @@
 #include <stdio.h>
 
-
 int main()
 {
-
-    char *k = "hey\!\!";
-
+    char* t = "hi!";
     return 0;
 }
