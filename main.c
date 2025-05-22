@@ -1,7 +1,6 @@
-#include <stdio.h>
-
 int main()
 {
-    char* t = "hi!";
+    char *t = "HELLO";
+    int k = 4 * 4;
     return 0;
 }

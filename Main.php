@@ -48,6 +48,12 @@ class TokenType
     const DOUBLE_PTR_TYPE = 'DOUBLE_PTR_TYPE';
     const VOID_PTR = 'VOID_PTR';
     const NATIVE_C_TY = ['bool','int','char','long','double','float'];
+
+    // arithmetic
+    const ADD = 'ADD';
+    const SUBTRACT = 'SUBTRACT';
+    const DIVIDE = 'DIVIDE';
+    const MULTIPLY = 'MULTIPLY';
 }
 
 class Token
@@ -96,7 +102,7 @@ class Lexer
 
     public function __construct($source)
     {
-        $this->tokens = array_unique([]);
+        $this->tokens = [];
         $this->source = $source;
     }
 
@@ -162,6 +168,8 @@ class Lexer
         $src = $this->source;
         $srcLen = strlen($src);
         $tok = null;
+        
+        
 
         while ($pos < $srcLen) {
 
@@ -170,8 +178,35 @@ class Lexer
             $numerical = "";
 
 
+            //string lit
+            if($tok === "\"")
+            {
+                $ident = '"';
+                $next = $pos + 1;
+                $closed = false;
+                while ($this->next_slot_open($src, $next) && !$closed) {
+                    if($src[$next] === '"')
+                    {
+                        $closed=true;
+                        
+                    }
+                    else if(!$closed){
+                        $nexttok = $src[$next];
+                        $ident .= $nexttok;   
+                    }
+
+                    $next++;
+                }
+
+                $ident .= '"';
+                $pos = $next;
+                
+                
+                $this->tokens[] = new Token(TokenType::STRING_LIT, $ident, $pos, $lineNo);
+                continue;
+            }
             // Check if its an include path
-            if($this->next_slot_open($src, $pos) && ($tok == '<' || $tok == '"')) {
+            else if($this->next_slot_open($src, $pos) && ($tok == '<' || $tok == '"')) {
 
                 if($tok == '<') $this->tokens[] = new Token(TokenType::OPEN_ANGLE_BRACKET, '<', $pos, $lineNo);
                 elseif ($tok == '"') $this->tokens[] = new Token(TokenType::DOUBLE_QUOTATION_MARK, '"', $pos,$lineNo);
@@ -222,25 +257,16 @@ class Lexer
 
                     $frwrd=$next + 1;
                     $ty_str = $ty_match[1];
-
+                    
                     if($this->next_slot_open($src,$next))
                     {
-                    /**
-                     * The lexer itself is rather brittle. We check for a 
-                     * ptr type by assuming the star char is glued to the type
-                     * immediately after
-                     * 
-                     * this completely names like: int *ptrName;
-                     * 
-                     * For the unfortunate people who use this, i am sorry. But i am not going to fix this.
-                     */
-
                         $p_ptr = $src[$frwrd];
 
-                        if($p_ptr == '*') {
+                        if($p_ptr === "*") {
 
                             $ty_str .= '*';
-                            //'char','long','double','float'
+                            $pos=$next;
+
                             switch($ty_str) {
                                 case 'bool*':
                                     $this->tokens[] = new Token(TokenType::BOOL_PTR_TYPE, $ty_str, $pos,$lineNo);
@@ -265,19 +291,16 @@ class Lexer
                                 case 'float*':
                                     $this->tokens[] = new Token(TokenType::FLOAT_PTR_TYPE, $ty_str, $pos, $lineNo);
                                     break;
-                                default:
-                                    $this->tokens[] = new Token(TokenType::VOID_PTR, $ty_str, $pos, $lineNo);
-                                    break;
+                                
                             }
-
-                            echo("(lex)Added pointer ty: " . $ty_str . PHP_EOL);
+                            $pos += 2;
                             continue;
                         }
                     }
 
                     $tt = $ty_match[2];
                     $this->tokens[] = new Token($tt, $ty_str,$pos,$lineNo);
-                    echo("(lex)Added Type: " . $ty_str . PHP_EOL);
+                    //echo("(lex)Added Type: " . $ty_str . PHP_EOL);
                     continue;
                 }
                 
@@ -285,6 +308,7 @@ class Lexer
                 continue;
 
             } else if (ctype_alnum($tok)) {
+
                 $numerical .= $tok;
                 $next = $pos + 1;
 
@@ -300,7 +324,7 @@ class Lexer
                 continue;
             }
 
-            if($tok === "\n"){ // cant believe === even exists
+            if($tok === "\n"){ // why does === even exist...
                 $lineNo++;
                 $pos++;
                 continue;
@@ -341,7 +365,7 @@ class Lexer
                     $pos++;
                     break;
                 case '*':
-                    $this->tokens[] = new Token(TokenType::STAR_OPERATOR, '*', $pos, $lineNo);
+                    $this->tokens[] = new Token(TokenType::MULTIPLY, '*', $pos, $lineNo);
                     $pos++;
                     break;
                 case '{':
@@ -363,6 +387,34 @@ class Lexer
     }
 }
 
+
+class Parser
+{
+    /**
+     * @var ParserContext
+     */
+    private $pCtx;
+
+    public function __construct($tok_arr)
+    {
+        $toks = $tok_arr;
+        $this->pCtx = new ParserContext(0, $toks);
+    }
+
+    public function getParserContext()
+    {
+        return $this->pCtx;
+    }
+
+    public function parseTokens()
+    {
+        // Loop through the lex'd tokens
+        $ctx = $this->getParserContext();
+        $tokens_arr = $ctx->getTokens();
+
+        print_r($tokens_arr);
+    }
+}
 
 abstract class AstNode {};
 
@@ -395,34 +447,5 @@ class ParserContext
     public function getPos()
     {
         return $this->pos;
-    }
-}
-
-
-class Parser
-{
-    /**
-     * @var ParserContext
-     */
-    private $pCtx;
-
-    public function __construct($tok_arr)
-    {
-        $toks = $tok_arr;
-        $this->pCtx = new ParserContext(0, $toks);
-    }
-
-    public function getParserContext()
-    {
-        return $this->pCtx;
-    }
-
-    public function parseTokens()
-    {
-        // Loop through the lex'd tokens
-        $ctx = $this->getParserContext();
-        $tokens_arr = $ctx->getTokens();
-
-        print_r($tokens_arr);
     }
 }
