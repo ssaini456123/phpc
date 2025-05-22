@@ -1,9 +1,10 @@
 #include <stdio.h>
 
+
 int main()
 {
 
-    char *k = "hey!!";
+    char *k = "hey\!\!";
 
     return 0;
 }

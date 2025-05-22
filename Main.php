@@ -3,6 +3,11 @@
 function entrypt($name, $echoOut)
 {
     $f = fopen($name, "r") or die("File not found.");
+
+
+    $f2 = fopen("LEXERFILE.txt", "w+");
+    fflush($f2);
+
     $lineNo = 1;
     $t_arr_arr = null;
 
@@ -14,8 +19,10 @@ function entrypt($name, $echoOut)
     }
 
     $p = new Parser($t_arr_arr);
-    $p->parseTokens();
+    $tt = print_r($p->parseTokens(),true);
+    fwrite($f2, $tt);
 
+    fclose($f2);
     fclose($f);
 }
 
@@ -32,17 +39,37 @@ class TokenType
     const CLOSE_ANGLE_BRACKET = 'CLOSE_ANGLE_BRACKET';
     const DOT = 'DOT';
     const SEMICOLON = 'SEMICOLON';
-    const DOUBLE_QUOTATION_MARK = '"';
-    const SINGLE_QUOTATION_MARK = '\'';
-    const STAR_OPERATOR = '*';
+    const DOUBLE_QUOTATION_MARK = 'DOUBLE_QUOTATION_MARK';
+    const SINGLE_QUOTATION_MARK = 'SINGLE_QUOTATION_MARK';
+    const STAR_OPERATOR = 'STAR_OPERATOR';
+    const OPEN_CURLY_BRACE = 'OPEN_CURLY_BRACE';
+    const CLOSE_CURLY_BRACE = 'CLOSE_CURLY_BRACE';
+    const OPEN_RECTANGULAR_BRACE = 'OPEN_RECTANGULAR_BRACE';
+    const CLOSE_RECTANGULAR_BRACE = 'CLOSE_RECTANGULAR_BRACE';
+    const INCLUDE_PATH = 'INCLUDE_PATH';
+    const STRING_LIT = 'STRING_LIT';
+
+    //sigh
+
+    const BOOL_TYPE = 'BOOL_TYPE';
+    const CHAR_TYPE = 'CHAR_TYPE';
+    const INT_TYPE = 'INT_TYPE';
+    const LONG_TYPE = 'LONG_TYPE';
+    const DOUBLE_TYPE = 'DOUBLE_TYPE';
+    const FLOAT_TYPE = 'FLOAT_TYPE';
+    const BOOL_PTR_TYPE = 'BOOL_PTR_TYPE';
+    const CHAR_PTR_TYPE = 'CHAR_PTR_TYPE';
+    const INT_PTR_TYPE = 'INT_PTR_TYPE';
+    const LONG_PTR_TYPE = 'LONG_PTR_TYPE';
+    const FLOAT_PTR_TYPE = 'FLOAT_PTR_TYPE';
 }
 
 class Token
 {
-    public $type;
-    public $text;
-    public $pos;
-    public $lineNo;
+    private $type;
+    private $text;
+    private $pos;
+    private $lineNo;
 
     public function __construct($type, $text, $pos, $lineNo)
     {
@@ -50,6 +77,26 @@ class Token
         $this->text = $text;
         $this->pos = $pos;
         $this->lineNo = $lineNo;
+    }
+
+    public function getLineNo()
+    {
+        return $this->lineNo;
+    }
+
+    public function getPos()
+    {
+        return $this->pos;
+    }
+
+    public function getText()
+    {
+        return $this->text;
+    }
+
+    public function getType()
+    {
+        return $this->type;
     }
 }
 
@@ -76,7 +123,6 @@ class Lexer
         }
     }
 
-
     public function tokenize($lineNo)
     {
         $pos = $this->pos;
@@ -89,6 +135,36 @@ class Lexer
             $tok = $src[$pos];
             $ident = "";
             $numerical = "";
+
+
+            // Check if its an include path
+            if($this->next_slot_open($src, $pos) && ($tok == '<' || $tok == '"')) {
+
+                if($tok == '<') $this->tokens[] = new Token(TokenType::OPEN_ANGLE_BRACKET, '<', $pos, $lineNo);
+                elseif ($tok == '"') $this->tokens[] = new Token(TokenType::DOUBLE_QUOTATION_MARK, '"', $pos,$lineNo);
+
+                $next = $pos+1;
+                $include_path = null;
+
+                while($this->next_slot_open($src,$pos) && ctype_space($src[$next])) $next++;
+                while ($this->next_slot_open($src, $next) && ctype_alpha($src[$next])) {
+                    $nexttok = $src[$next];
+                    $include_path .= $nexttok;
+                    $next++;
+                }
+
+                // Check if theres a dot
+                if($this->next_slot_open($src,$next) && $src[$next] == '.') {
+                    $next++; // skip the dot
+                    $next++; // We can make the ridiculous assumption that all headers end in '.h' since this is C
+                    $include_path .= '.h';
+                    if ($this->next_slot_open($src,$next) && ($src[$next] == '>' || $src[$next] == '"')) {
+                        $this->tokens[] = new Token(TokenType::INCLUDE_PATH, $include_path, $pos,$lineNo);
+                        $pos = $next;
+                        continue;
+                    }
+                }
+            }
 
             if (ctype_alpha($tok)) {
                 $ident .= $tok;
@@ -104,6 +180,7 @@ class Lexer
 
                 $pos = $next;
                 $this->tokens[] = new Token(TokenType::IDENT, $ident, $pos, $lineNo);
+                continue;
             } else if (ctype_alnum($tok)) {
                 $numerical .= $tok;
                 $next = $pos + 1;
@@ -117,44 +194,60 @@ class Lexer
                 }
                 $pos = $next;
                 $this->tokens[] = new Token(TokenType::NUMERICAL, $numerical, $pos, $lineNo);
+                continue;
             }
+
 
             switch ($tok) {
                 case '(':
                     $this->tokens[] = new Token(TokenType::OPEN_PAREN, '(', $pos, $lineNo);
+                    $pos++;
                     break;
                 case ')':
                     $this->tokens[] = new Token(TokenType::CLOSE_PAREN, ')', $pos, $lineNo);
+                    $pos++;
                     break;
                 case '#':
                     $this->tokens[] = new Token(TokenType::POUND, '#', $pos, $lineNo);
+                    $pos++;
                     break;
                 case '>':
                     $this->tokens[] = new Token(TokenType::CLOSE_ANGLE_BRACKET, '>', $pos, $lineNo);
+                    $pos++;
                     break;
                 case '<':
                     $this->tokens[] = new Token(TokenType::OPEN_ANGLE_BRACKET, '<', $pos, $lineNo);
+                    $pos++;
                     break;
                 case '.':
                     $this->tokens[] = new Token(TokenType::DOT, '.', $pos, $lineNo);
+                    $pos++;
                     break;
                 case ';':
                     $this->tokens[] = new Token(TokenType::SEMICOLON, ';', $pos, $lineNo);
+                    $pos++;
                     break;
                 case '\'':
                     $this->tokens[] = new Token(TokenType::SINGLE_QUOTATION_MARK, '\'', $pos, $lineNo);
-                    break;
-                case '"':
-                    $this->tokens[] = new Token(TokenType::DOUBLE_QUOTATION_MARK, '"', $pos, $lineNo);
+                    $pos++;
                     break;
                 case '*':
                     $this->tokens[] = new Token(TokenType::STAR_OPERATOR, '*', $pos, $lineNo);
+                    $pos++;
+                    break;
+                case '{':
+                    $this->tokens[] = new Token(TokenType::OPEN_CURLY_BRACE, '{', $pos, $lineNo);
+                    $pos++;
+                    break;
+                case '}':
+                    $this->tokens[] = new Token(TokenType::CLOSE_CURLY_BRACE, '}', $pos, $lineNo);
+                    $pos++;
                     break;
                 default:
                     //fprintf(STDERR, "Unknown tok (" . $tok . ")\n");
+                    $pos++;
                     break;
             }
-            $pos++;
         }
 
         return $this->tokens;
@@ -189,6 +282,11 @@ class ParserContext
     {
         return $this->tokens;
     }
+
+    public function getPos()
+    {
+        return $this->pos;
+    }
 }
 
 
@@ -211,22 +309,25 @@ class Parser
     {
         // Loop through the lex'd tokens
         $ctx = $this->getParserContext();
+        $tokens_arr = $ctx->getTokens();
+
         $inner_toks = [];
-        foreach ($ctx->getTokens() as $token_list) {
-            $arrsz = sizeof($token_list);
-            if ($arrsz == 0) {
+        $i=0;
+        $arrsz = sizeof($tokens_arr);
+
+        for(; $i < $arrsz;$i++)
+        {
+            $curr_tok_arr = $tokens_arr[$i];
+
+            # Skip the blank lines
+            if(sizeof($curr_tok_arr) == 0) {
                 continue;
             }
-            $inner_toks[][] = $token_list;
+
+            $inner_toks[] = $ctx->getTokens()[$i];
         }
 
-        print_r($inner_toks);
-    }
 
-    public function parsePreprocessorDirective()
-    {
-        $toks = $this->getParserContext()->getTokens();
-
-        var_dump($toks);
+        return $inner_toks; //?????
     }
 }
