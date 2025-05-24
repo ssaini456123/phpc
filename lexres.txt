@@ -1,0 +1,171 @@
+Array
+(
+    [0] => Token Object
+        (
+            [type:Token:private] => INT_TYPE
+            [text:Token:private] => int
+            [pos:Token:private] => 5
+            [lineNo:Token:private] => 2
+        )
+
+    [1] => Token Object
+        (
+            [type:Token:private] => IDENT
+            [text:Token:private] => test
+            [pos:Token:private] => 10
+            [lineNo:Token:private] => 2
+        )
+
+    [2] => Token Object
+        (
+            [type:Token:private] => OPEN_PAREN
+            [text:Token:private] => (
+            [pos:Token:private] => 10
+            [lineNo:Token:private] => 2
+        )
+
+    [3] => Token Object
+        (
+            [type:Token:private] => INT_TYPE
+            [text:Token:private] => int
+            [pos:Token:private] => 14
+            [lineNo:Token:private] => 2
+        )
+
+    [4] => Token Object
+        (
+            [type:Token:private] => IDENT
+            [text:Token:private] => x
+            [pos:Token:private] => 16
+            [lineNo:Token:private] => 2
+        )
+
+    [5] => Token Object
+        (
+            [type:Token:private] => INT_TYPE
+            [text:Token:private] => int
+            [pos:Token:private] => 20
+            [lineNo:Token:private] => 2
+        )
+
+    [6] => Token Object
+        (
+            [type:Token:private] => IDENT
+            [text:Token:private] => y
+            [pos:Token:private] => 22
+            [lineNo:Token:private] => 2
+        )
+
+    [7] => Token Object
+        (
+            [type:Token:private] => CLOSE_PAREN
+            [text:Token:private] => )
+            [pos:Token:private] => 22
+            [lineNo:Token:private] => 2
+        )
+
+    [8] => Token Object
+        (
+            [type:Token:private] => OPEN_CURLY_BRACE
+            [text:Token:private] => {
+            [pos:Token:private] => 25
+            [lineNo:Token:private] => 3
+        )
+
+    [9] => Token Object
+        (
+            [type:Token:private] => CLOSE_CURLY_BRACE
+            [text:Token:private] => }
+            [pos:Token:private] => 28
+            [lineNo:Token:private] => 4
+        )
+
+    [10] => Token Object
+        (
+            [type:Token:private] => INT_TYPE
+            [text:Token:private] => int
+            [pos:Token:private] => 38
+            [lineNo:Token:private] => 7
+        )
+
+    [11] => Token Object
+        (
+            [type:Token:private] => IDENT
+            [text:Token:private] => main
+            [pos:Token:private] => 43
+            [lineNo:Token:private] => 7
+        )
+
+    [12] => Token Object
+        (
+            [type:Token:private] => OPEN_PAREN
+            [text:Token:private] => (
+            [pos:Token:private] => 43
+            [lineNo:Token:private] => 7
+        )
+
+    [13] => Token Object
+        (
+            [type:Token:private] => INT_TYPE
+            [text:Token:private] => int
+            [pos:Token:private] => 47
+            [lineNo:Token:private] => 7
+        )
+
+    [14] => Token Object
+        (
+            [type:Token:private] => IDENT
+            [text:Token:private] => argv
+            [pos:Token:private] => 52
+            [lineNo:Token:private] => 7
+        )
+
+    [15] => Token Object
+        (
+            [type:Token:private] => CLOSE_PAREN
+            [text:Token:private] => )
+            [pos:Token:private] => 52
+            [lineNo:Token:private] => 7
+        )
+
+    [16] => Token Object
+        (
+            [type:Token:private] => OPEN_CURLY_BRACE
+            [text:Token:private] => {
+            [pos:Token:private] => 55
+            [lineNo:Token:private] => 8
+        )
+
+    [17] => Token Object
+        (
+            [type:Token:private] => IDENT
+            [text:Token:private] => return
+            [pos:Token:private] => 68
+            [lineNo:Token:private] => 9
+        )
+
+    [18] => Token Object
+        (
+            [type:Token:private] => NUMERICAL
+            [text:Token:private] => 0
+            [pos:Token:private] => 70
+            [lineNo:Token:private] => 9
+        )
+
+    [19] => Token Object
+        (
+            [type:Token:private] => SEMICOLON
+            [text:Token:private] => ;
+            [pos:Token:private] => 70
+            [lineNo:Token:private] => 9
+        )
+
+    [20] => Token Object
+        (
+            [type:Token:private] => CLOSE_CURLY_BRACE
+            [text:Token:private] => }
+            [pos:Token:private] => 73
+            [lineNo:Token:private] => 10
+        )
+
+)

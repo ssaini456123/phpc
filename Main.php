@@ -6,20 +6,16 @@ function entrypt($name, $echoOut)
 {
     $f = fopen($name, "r") or die("File not found.");
     $src = file_get_contents($name);
+    
+    echo("Note: it is recommended you use an external preprocessor program to expand macros." . PHP_EOL);
 
-    $pp = new Preprocessor($src);
-    $pp->preprocess();
-
-
-    /*
     $lex = new Lexer($src);
     $tarr = $lex->tokenize();
     $p = new Parser($tarr);
-    $p->parseTokens();
-    */
+    $p->parse_tokens();
 }
 
-entrypt("main.c", false);
+entrypt("main.L", false);
 
 class TokenType
 {
@@ -31,6 +27,7 @@ class TokenType
     const OPEN_ANGLE_BRACKET = 'OPEN_ANGLE_BRACKET';
     const CLOSE_ANGLE_BRACKET = 'CLOSE_ANGLE_BRACKET';
     const DOT = 'DOT';
+    const COMMA = 'COMMA';
     const SEMICOLON = 'SEMICOLON';
     const DOUBLE_QUOTATION_MARK = 'DOUBLE_QUOTATION_MARK';
     const SINGLE_QUOTATION_MARK = 'SINGLE_QUOTATION_MARK';
@@ -54,9 +51,10 @@ class TokenType
     const INT_PTR_TYPE = 'INT_PTR_TYPE';
     const LONG_PTR_TYPE = 'LONG_PTR_TYPE';
     const FLOAT_PTR_TYPE = 'FLOAT_PTR_TYPE';
+    const VOID_TYPE='VOID_TYPE';
     const DOUBLE_PTR_TYPE = 'DOUBLE_PTR_TYPE';
     const VOID_PTR = 'VOID_PTR';
-    const NATIVE_C_TY = ['bool', 'int', 'char', 'long', 'double', 'float'];
+    const NATIVE_C_TY = ['bool', 'int', 'char', 'long', 'double', 'float','void'];
 
     // arithmetic
     const ADD = 'ADD';
@@ -137,6 +135,10 @@ class Lexer
         $tt = null;
 
         switch ($ident) {
+            case 'void':
+                $ty_str='void';
+                $tt=TokenType::VOID_TYPE;
+                break;
             case 'bool':
                 $ty_str = 'bool';
                 $tt = TokenType::BOOL_TYPE;
@@ -266,6 +268,9 @@ class Lexer
                                 case 'float*':
                                     $this->tokens[] = new Token(TokenType::FLOAT_PTR_TYPE, $ty_str, $pos, $lineNo);
                                     break;
+                                case 'void*':
+                                    $this->tokens[] = new Token(TokenType::VOID_PTR, $ty_str, $pos, $lineNo);
+                                    break;
                             }
                             $pos += 2;
                             continue;
@@ -349,6 +354,10 @@ class Lexer
                     $this->tokens[] = new Token(TokenType::CLOSE_CURLY_BRACE, '}', $pos, $lineNo);
                     $pos++;
                     break;
+                case ',':
+                    $this->tokens[] = new Token(TokenType::COMMA, ',', $pos, $lineNo);
+                    $pos++;
+                    break;
                 default:
                     //fprintf(STDERR, "Unknown tok (" . $tok . ")\n");
                     $pos++;
@@ -362,16 +371,51 @@ class Lexer
 
 abstract class AstNode {};
 
-class IncludeDirective extends AstNode
+class FunctionNode extends AstNode 
 {
-    public $header;
+    public $func_name;
+    public $block;
+    public $retTy;
 
-    public function get_header()
+    public function __construct($name,$stmts,$returnTy)
     {
-        return $this->header;
+        $this->func_name = $name;
+        $this->block = $stmts;
+        $this->retTy = $returnTy;
     }
 }
 
+class ReturnNode extends AstNode
+{
+    public $ret;
+
+    public function __construct($ret)
+    {
+        $this->ret = $ret;
+    }
+}
+
+class FunctionCallNode extends AstNode
+{
+    public $name;
+    public $args;
+
+    public function __construct($name,$args)
+    {
+        $this->name = $name;
+        $this->args = $args;
+    }
+}
+
+class BlockNode extends AstNode
+{
+    public $statements;
+
+    public function __construct($stmt)
+    {
+        $this->statements = $stmt;
+    }
+}
 
 class Parser
 {
@@ -391,13 +435,110 @@ class Parser
         return $this->pCtx;
     }
 
-    public function parseTokens()
+    public function parse_function()
+    {
+        
+        $ctx=$this->pCtx;
+        $is_func = false;
+
+        //print_r($ctx->current());
+        //echo(PHP_EOL);
+
+        $return_type = null;
+        $func_name = null;
+        $arguments = [];
+
+        if(in_array($ctx->current()->get_text(), TokenType::NATIVE_C_TY))
+        {
+            $return_type=$ctx->current();
+            $ctx->advance();
+
+            if($ctx->current()->get_type() == TokenType::IDENT)
+            {
+                $func_name=$ctx->current()->get_text();
+            }
+
+            if($func_name === '') {
+                return;
+            }
+
+            $ctx->advance();
+
+            if($ctx->current()->get_type() == TokenType::OPEN_PAREN) {
+                // it is a function, parse the arguments
+                $ctx->advance();
+
+                while($ctx->current()->get_type())
+                {
+                    if($ctx->current()->get_type() == TokenType::COMMA) {
+                        print_r($ctx->current()->get_type());
+                        $ctx->advance();
+                        continue;
+                    } else if ($ctx->current()->get_type() == TokenType::CLOSE_PAREN){
+                        $ctx->advance();
+                        break;
+                    }
+                    $argument_type = $ctx->current();
+                    $txt=$argument_type->get_text();
+                    //echo(in_array($txt,TokenType::NATIVE_C_TY).PHP_EOL);
+                    if(!in_array($txt, TokenType::NATIVE_C_TY)) {
+                        //echo("ERR: Argument type must be native C type.".PHP_EOL);
+                        return;
+                    }
+
+                    $ctx->advance();
+                    
+                    $argument_name = $ctx->current();
+                    
+                    if(!$argument_name->get_type() == TokenType::IDENT) {
+                        echo("ERR: Argument name must be a valid identifier.".PHP_EOL);
+                        return;
+                    }
+
+                    $arguments[] = [
+                        "type" => $argument_type->get_text(),
+                        "name"=>$argument_name->get_text(),
+                    ];
+
+                    $ctx->advance();
+                }
+        
+                print_r(' Function: ' . $func_name . '  --- Has ret->' . $return_type->get_text() . "\t" . 'Has argument properties: ');
+                var_dump($arguments);
+                echo(PHP_EOL);
+                $is_func = true;
+
+            } else {
+                // probably not
+                return;
+            }
+
+            
+        }
+
+        if(!$is_func) return;
+
+        //TODO: parse body
+        //TODO: parse ret stmt
+    }
+
+    public function parse_tokens()
     {
         // Loop through the lex'd tokens
         $ctx = $this->get_parser_context();
         $tokens_arr = $ctx->get_tokens();
-
-        print_r($tokens_arr);
+        $node_arr = array();
+        //print_r($ctx->get_tokens());
+        while($ctx->current())
+        {
+            $node = $this->parse_function();
+            if($node)
+            {
+                $node_arr[] = $node;
+            } else {
+                $ctx->advance();
+            }
+        }
     }
 }
 
@@ -426,18 +567,24 @@ class ParserContext
 
     public function advance()
     {
+        
         $this->pos++;
     }
 
     public function expect($token)
     {
         $peek = $this->current();
-        $p_ty = $peek->get_type();
-        $tty = $token->get_type();
+        $p_ty = $peek->get_text();
+        $tty = $token;//STRING VALUE
         $t_line_no = $peek->get_line_no();
 
+        if(!$peek) {
+            //echo ("!! ERR !! Unkown token " . $p_ty . " on line: " . strval($t_line_no) . PHP_EOL);
+            return false;
+        }
+
         if ($p_ty != $tty) {
-            echo ("!! ERR !! Unkown token " . $p_ty . " on line: " . strval($t_line_no));
+            //echo("!! ERR !! Expected " . $token . ' but got: '. $tty . ' instead.' . PHP_EOL);
             return false;
         } else {
             $this->advance();
@@ -447,6 +594,7 @@ class ParserContext
 
     public function current()
     {
+        
         $p = $this->get_pos();
         $t = $this->get_tokens()[$p];
         return $t;
@@ -455,18 +603,12 @@ class ParserContext
     public function match($ty)
     {
         $peek = $this->current();
-        $tty = $peek->get_type();
+        $tty = $peek->get_text();
 
         if ($tty == $ty) {
             return true;
         } else {
             return false;
         }
-    }
-
-    public function parse_tokens_list()
-    {
-        $tokens = $this->get_tokens();
-        print_r($tokens);
     }
 }
