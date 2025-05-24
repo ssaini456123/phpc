@@ -1,13 +1,23 @@
 <?php
 
+const RETURNCODE_FAIL = 69;
+
 function entrypt($name, $echoOut)
 {
     $f = fopen($name, "r") or die("File not found.");
     $src = file_get_contents($name);
+
+    //$pp = new Preprocessor($src);
+    //$pp->preprocess();
+
+    
+
     $lex = new Lexer($src);
     $tarr = $lex->tokenize();
     $p = new Parser($tarr);
     $p->parseTokens();
+
+    
 }
 
 entrypt("main.c", false);
@@ -56,6 +66,14 @@ class TokenType
     const MULTIPLY = 'MULTIPLY';
 }
 
+class PreprocessorDirectiveType extends TokenType
+{
+    const PP_TY_INCLUDE = 'PREPROCESSOR_INCLUDE';
+    const PP_TY_IF = 'PREPROCESSOR_IF';
+    const PP_TY_ENDIF = 'PREPROCESSOR_ENDIF';
+    const PP_TY_DEFINE = 'PREPROCESSOR_DEFINE';
+}
+
 class Token
 {
     private $type;
@@ -71,22 +89,22 @@ class Token
         $this->lineNo = $lineNo;
     }
 
-    public function getLineNo()
+    public function get_line_no()
     {
         return $this->lineNo;
     }
 
-    public function getPos()
+    public function get_pos()
     {
         return $this->pos;
     }
 
-    public function getText()
+    public function get_text()
     {
         return $this->text;
     }
 
-    public function getType()
+    public function get_type(): TokenType
     {
         return $this->type;
     }
@@ -168,7 +186,7 @@ class Lexer
         $src = $this->source;
         $srcLen = strlen($src);
         $tok = null;
-        
+        $last_token = null;
         
 
         while ($pos < $srcLen) {
@@ -177,9 +195,40 @@ class Lexer
             $ident = "";
             $numerical = "";
 
+            // Check if its an include path
+            if($this->next_slot_open($src, $pos) && ($tok == '<' || $tok === '"')) {
 
+                if($tok == '<') $this->tokens[] = new Token(TokenType::OPEN_ANGLE_BRACKET, '<', $pos, $lineNo);
+                elseif ($tok == '"') $this->tokens[] = new Token(TokenType::DOUBLE_QUOTATION_MARK, '"', $pos,$lineNo);
+
+                $next = $pos+1;
+                $include_path = null;
+
+                while($this->next_slot_open($src,$pos) && ctype_space($src[$next])) $next++;
+                
+                while ($this->next_slot_open($src, $next) && ctype_alpha($src[$next])) {
+                    $nexttok = $src[$next];
+                    $include_path .= $nexttok;
+                    $next++;
+                }
+
+                // Check if theres a dot
+                if($this->next_slot_open($src,$next) && $src[$next] === '.') {
+                    $next++; // skip the dot
+                    $next++; // We can make the ridiculous assumption that all headers end in '.h' since this is C
+                             
+                    $include_path .= '.h';
+                    if ($this->next_slot_open($src,$next) && ($src[$next] == '>' || $src[$next] == '"')) {
+                        $this->tokens[] = new Token(TokenType::INCLUDE_PATH, $include_path, $pos,$lineNo);
+                        $pos = $next;
+                        continue;
+                    }
+                }
+            }
+
+            
             //string lit
-            if($tok === "\"")
+            else if($tok === "\"")
             {
                 $ident = '"';
                 $next = $pos + 1;
@@ -188,7 +237,6 @@ class Lexer
                     if($src[$next] === '"')
                     {
                         $closed=true;
-                        
                     }
                     else if(!$closed){
                         $nexttok = $src[$next];
@@ -204,34 +252,6 @@ class Lexer
                 
                 $this->tokens[] = new Token(TokenType::STRING_LIT, $ident, $pos, $lineNo);
                 continue;
-            }
-            // Check if its an include path
-            else if($this->next_slot_open($src, $pos) && ($tok == '<' || $tok == '"')) {
-
-                if($tok == '<') $this->tokens[] = new Token(TokenType::OPEN_ANGLE_BRACKET, '<', $pos, $lineNo);
-                elseif ($tok == '"') $this->tokens[] = new Token(TokenType::DOUBLE_QUOTATION_MARK, '"', $pos,$lineNo);
-
-                $next = $pos+1;
-                $include_path = null;
-
-                while($this->next_slot_open($src,$pos) && ctype_space($src[$next])) $next++;
-                while ($this->next_slot_open($src, $next) && ctype_alpha($src[$next])) {
-                    $nexttok = $src[$next];
-                    $include_path .= $nexttok;
-                    $next++;
-                }
-
-                // Check if theres a dot
-                if($this->next_slot_open($src,$next) && $src[$next] == '.') {
-                    $next++; // skip the dot
-                    $next++; // We can make the ridiculous assumption that all headers end in '.h' since this is C
-                    $include_path .= '.h';
-                    if ($this->next_slot_open($src,$next) && ($src[$next] == '>' || $src[$next] == '"')) {
-                        $this->tokens[] = new Token(TokenType::INCLUDE_PATH, $include_path, $pos,$lineNo);
-                        $pos = $next;
-                        continue;
-                    }
-                }
             }
 
             if (ctype_alpha($tok)) {
@@ -387,6 +407,18 @@ class Lexer
     }
 }
 
+abstract class AstNode {};
+
+class IncludeDirective extends AstNode
+{
+    public $header;
+
+    public function get_header()
+    {
+        return $this->header;
+    }
+}
+
 
 class Parser
 {
@@ -401,7 +433,7 @@ class Parser
         $this->pCtx = new ParserContext(0, $toks);
     }
 
-    public function getParserContext()
+    public function get_parser_context()
     {
         return $this->pCtx;
     }
@@ -409,29 +441,19 @@ class Parser
     public function parseTokens()
     {
         // Loop through the lex'd tokens
-        $ctx = $this->getParserContext();
-        $tokens_arr = $ctx->getTokens();
+        $ctx = $this->get_parser_context();
+        $tokens_arr = $ctx->get_tokens();
 
         print_r($tokens_arr);
     }
 }
 
-abstract class AstNode {};
 
-class IncludeDirective extends AstNode
-{
-    public $header;
-
-    public function getHeader()
-    {
-        return $this->header;
-    }
-}
 
 class ParserContext
 {
-    public $pos;
-    public $tokens;
+    private int $pos;
+    private $tokens;
 
     public function __construct($pos, $tokens)
     {
@@ -439,13 +461,61 @@ class ParserContext
         $this->tokens = $tokens;
     }
 
-    public function getTokens()
+    public function get_tokens(): array
     {
         return $this->tokens;
     }
 
-    public function getPos()
+    public function get_pos()
     {
         return $this->pos;
+    }
+
+    public function advance()
+    {
+        $this->pos++;
+    }
+
+    public function expect($token)
+    {
+        $peek = $this->current();
+        $p_ty = $peek->get_type();
+        $tty = $token->get_type();
+        $t_line_no = $peek->get_line_no();
+
+        if($p_ty != $tty)
+        {
+            echo("!! ERR !! Unkown token " . $p_ty . " on line: " . strval($t_line_no));
+            return false;
+        } else {
+            $this->advance();
+            return true;
+        }
+    }
+
+    public function current()
+    {
+        $p = $this->get_pos();
+        $t = $this->get_tokens()[$p];
+        return $t;
+    }
+
+    public function match($ty)
+    {
+        $peek = $this->current();
+        $tty = $peek->get_type();
+
+        if ($tty==$ty)
+        {
+            return true;
+        } else {
+           return false;
+        }
+    }
+
+    public function parse_tokens_list()
+    {
+        $tokens = $this->get_tokens();
+        print_r($tokens);
     }
 }
