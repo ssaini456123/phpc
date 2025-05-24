@@ -1,4 +1,5 @@
-#include "stdio.h"
+#include <stdio.h>
+
 #ifdef 0
 #endif
 int main()
