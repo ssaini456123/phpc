@@ -7,15 +7,16 @@ function entrypt($name, $echoOut)
     $f = fopen($name, "r") or die("File not found.");
     $src = file_get_contents($name);
 
-    //$pp = new Preprocessor($src);
-    //$pp->preprocess();
+    $pp = new Preprocessor($src);
+    $pp->preprocess();
 
 
-
+    /*
     $lex = new Lexer($src);
     $tarr = $lex->tokenize();
     $p = new Parser($tarr);
     $p->parseTokens();
+    */
 }
 
 entrypt("main.c", false);
@@ -76,11 +77,55 @@ class PreprocessorDirectiveType extends TokenType
 class Preprocessor
 {
     private $tokens;
+    private $pos;
 
     public function __construct($src)
     {
         $lexer = new Lexer($src);
         $this->tokens = $lexer->tokenize();
+        $this->pos = 0;
+    }
+
+    private function find_directives()
+    {
+        //print_r($this->tokens[$this->pos]);
+        while($this->pos < count($this->tokens))
+        {
+                
+            $tok = $this->tokens[$this->pos];
+            $ty = $tok->get_type();
+
+            if($ty == TokenType::POUND) {
+                $this->pos++;
+                $this->parse_directive();
+                continue;
+            }
+           $this->pos++; 
+        }
+    }
+
+    private function parse_directive() 
+    {
+        $directive_token = $this->tokens[$this->pos];
+        $directive_name = $directive_token->get_text();
+
+        switch($directive_name)
+        {
+            case 'include':
+                echo("Hit the include directive". PHP_EOL);
+                break;
+            case 'ifdef':
+                echo("hit the ifdef directive" . PHP_EOL);
+                break;
+            case 'endif':
+                echo("hit the endif directive". PHP_EOL);
+                break;
+        }
+    }
+
+    public function preprocess()
+    {
+        $this->find_directives();
     }
 }
 
@@ -114,7 +159,7 @@ class Token
         return $this->text;
     }
 
-    public function get_type(): TokenType
+    public function get_type()
     {
         return $this->type;
     }
