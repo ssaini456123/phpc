@@ -92,7 +92,7 @@ class Parser
         if ($ctx->current()->get_type() == TokenType::OPEN_CURLY_BRACE) {
             $ctx->advance();
             while ($ctx->current()->get_type() != TokenType::CLOSE_CURLY_BRACE) {
-                $statement = $this->parse_statement();
+                $statement = $this->parse_block();
 
                 if ($statement) {
                     $statements[] = $statement;
@@ -106,15 +106,13 @@ class Parser
         return $function;
     }
 
-    public function parse_statement()
+    public function parse_block()
     {
         $ctx = $this->pCtx;
         $parameters = [];
 
         $curr = $ctx->current()->get_type();
 
-
-        // is it a function call?
         if ($curr == TokenType::IDENT) {
             $possible_func_name = $ctx->current()->get_text();
 
@@ -141,12 +139,11 @@ class Parser
                     echo ("ERR: call must end with a semicolon ';'." . PHP_EOL);
                     return null;
                 }
-            }
 
-            $func_call_statement = new FunctionCallNode($possible_func_name, $parameters);
-            return $func_call_statement;
-        } else {
-            return;
+                $func_call_statement = new FunctionCallNode($possible_func_name, $parameters);
+                print_r($func_call_statement);
+                return $func_call_statement;
+            }
         }
     }
 

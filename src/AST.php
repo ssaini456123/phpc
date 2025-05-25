@@ -48,18 +48,18 @@ class BlockNode extends AstNode
 
 class FunctionCallNode extends AstNode
 {
-    public $f_name;
+    public $func_name;
     public $call_args;
 
     public function __construct($f_name, $call_args)
     {
-        $this->f_name = $f_name;
+        $this->func_name = $f_name;
         $this->call_args = $call_args;
     }
 
     public function __toString()
     {
-        $str = 'FunctionCall(func=' . $this->f_name . ', arguments=';
+        $str = 'FunctionCall(func=' . $this->func_name . ', arguments=';
         foreach ($this->call_args as $individual_arg) {
             $str .= $individual_arg;
         }
