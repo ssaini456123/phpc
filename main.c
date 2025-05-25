@@ -1,7 +1,6 @@
 int test(int x, int y)
 {
     char c;
-    c = 'hi';
     return c;
 }
 
