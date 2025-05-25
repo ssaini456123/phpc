@@ -1,5 +1,5 @@
 (defun f ()
-  (let ((x 5) (y x) (z x))
+  (let ((x y) (y z) (z x))
   z)
 )
 

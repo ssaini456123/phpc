@@ -4,11 +4,9 @@ int f()
     int x;
     int y;
     int z;
-
-    x = 5 - 3;
-    y = x - 9;
-    z = x + y - x;
-
+    x = y;
+    y = z;
+    z = x;
     return z;
 }
 
