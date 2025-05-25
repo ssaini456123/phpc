@@ -1,13 +1,13 @@
 int test(int x, int y)
 {
-    int c;
-    c = 5;
-
+    char c;
+    c = 'hi';
     return c;
 }
 
-int main() {
+int main()
+{
     printf("Hello, World!");
-    test(4,2);
+    test(4, 2);
     return 0;
 }

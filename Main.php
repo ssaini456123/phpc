@@ -19,4 +19,4 @@ function entrypt($name, $echoOut)
     $p->parse_tokens();
 }
 
-entrypt("main.L", false);
+entrypt("main.c", false);

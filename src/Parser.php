@@ -230,7 +230,8 @@ class Parser
             $lisp_output .= $this->generate_lisp_code($fn_node) . "\n\n";
         }
 
-        echo ($lisp_output);
+
+        file_put_contents('output.lisp', $lisp_output);
     }
 
     public function generate_lisp_code($node)
