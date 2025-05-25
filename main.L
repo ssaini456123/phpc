@@ -1,8 +1,13 @@
-int counter(int x, int y)
+int test(int x, int y)
 {
-    test(1,2);
+    int c;
+    c = 5;
 
-    int x;
+    return c;
+}
 
-    x = 5;
+int main() {
+    printf("Hello, World!");
+    test(4,2);
+    return 0;
 }

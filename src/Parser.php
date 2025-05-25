@@ -108,7 +108,6 @@ class Parser
         }
 
         $function = new FunctionNode($func_name, $arguments, $statements, $return_type);
-        print_r($function);
         return $function;
     }
 
@@ -117,13 +116,39 @@ class Parser
         $ctx = $this->pCtx;
         $parameters = [];
 
-        $curr = $ctx->current()->get_type();
+        $tok = $ctx->current();
+        $curr = $tok->get_type();
+
+        if ($ctx->current()->get_text() == 'return') {
+
+            $ctx->advance();
+            $tok = $ctx->current();
+            $ctx->advance();
+
+            $semi = $ctx->expect(';');
+            if ($semi) {
+                // determine if retval is a literla or a symbolic
+                if ($tok->get_type() == TokenType::NUMERICAL || $tok->get_type() == TokenType::STRING_LIT) {
+                    $literalNode = new LiteralNode($tok->get_text());
+                    $retval = new ReturnNode($literalNode);
+                    return $retval;
+                } else {
+                    $identifierNode = new IdentifierNode($tok);
+                    $retval = new ReturnNode($identifierNode);
+                    return $retval;
+                }
+            } else {
+                echo ("Return statement must end with a semi colon ';'.");
+                return null;
+            }
+        }
 
         if ($curr == TokenType::IDENT) {
             $possible_func_name = $ctx->current()->get_text();
 
             $ctx->advance();
             $curr = $ctx->current()->get_type();
+
 
             //func(x,y,z);
             //    ^ we are here
@@ -145,8 +170,12 @@ class Parser
                     echo ("ERR: call must end with a semicolon ';'." . PHP_EOL);
                     return null;
                 }
-
-                $func_call_statement = new FunctionCallNode($possible_func_name, $parameters);
+                $func_call_statement = null;
+                if ($possible_func_name === 'printf') {
+                    $func_call_statement = new PrintFNode("printf", $parameters);
+                } else {
+                    $func_call_statement = new FunctionCallNode($possible_func_name, $parameters);
+                }
                 return $func_call_statement;
             }
 
@@ -172,7 +201,6 @@ class Parser
             $ctx->advance();
             if ($ctx->expect(';')) {
                 $this->symbol_table->store($var_name, null);
-                print_r($this->symbol_table);
                 return new VariableDeclarationNode($type, $var_name);
             } else {
                 echo ("ERR: Improper variable declaration");
@@ -194,6 +222,88 @@ class Parser
             } else {
                 $ctx->advance();
             }
+        }
+
+        $lisp_output = null;
+
+        foreach ($node_arr as $fn_node) {
+            $lisp_output .= $this->generate_lisp_code($fn_node) . "\n\n";
+        }
+
+        echo ($lisp_output);
+    }
+
+    public function generate_lisp_code($node)
+    {
+        if ($node instanceof FunctionNode) {
+            $args = array_map(fn($arg) => $arg['name'], $node->arguments ?? []);
+            $body = [];
+
+            // To collect let bindings
+            $let_bindings = [];
+
+            foreach ($node->statements as $stmt) {
+                if ($stmt instanceof VariableDeclarationNode) {
+                    $let_bindings[] = [$stmt->variable_name, 'nil'];
+                } elseif ($stmt instanceof VariableAssignment) {
+                    // Check if it's already declared in let
+                    $already_declared = false;
+                    foreach ($let_bindings as &$bind) {
+                        if ($bind[0] === $stmt->variable_name) {
+                            $bind[1] = self::value_to_lisp($stmt->value);
+                            $already_declared = true;
+                            break;
+                        }
+                    }
+                    if (!$already_declared) {
+                        $body[] = "(setf {$stmt->variable_name} " . self::value_to_lisp($stmt->value) . ")";
+                    }
+                } else {
+                    $body[] = self::generate_lisp_code($stmt);
+                }
+            }
+
+
+            $body_str = implode("\n  ", $body);
+            if (!empty($let_bindings)) {
+                $bindings_str = implode(' ', array_map(fn($b) => "({$b[0]} {$b[1]})", $let_bindings));
+                $body_str = "(let ($bindings_str)\n  $body_str)";
+            }
+
+            $s = "(defun {$node->func_name} (" . implode(' ', $args) . ")\n  $body_str\n)";
+            if (strlen($bindings_str) > 0) {
+
+                return $s;
+            } else {
+                return $s;
+            }
+        } elseif ($node instanceof FunctionCallNode) {
+            $args_str = implode(' ', array_map(fn($a) => self::value_to_lisp($a), $node->call_args ?? []));
+            return "({$node->func_name} $args_str)";
+        } elseif ($node instanceof PrintfNode) {
+            $fmt = self::value_to_lisp($node->fmt[0]);
+            $args = array_slice($node->fmt, 1);
+            $args_str = implode(' ', array_map(fn($a) => self::value_to_lisp($a), $args));
+            return "(format t $fmt $args_str)";
+        } elseif ($node instanceof ReturnNode) {
+            return self::generate_lisp_code($node->retval);
+        } elseif ($node instanceof IdentifierNode) {
+            return $node->ident->get_text();
+        } elseif ($node instanceof LiteralNode) {
+            return self::value_to_lisp($node->lit);
+        }
+
+        return "";
+    }
+
+    private static function value_to_lisp($value)
+    {
+        if (is_numeric($value)) {
+            return $value;
+        } elseif (is_string($value)) {
+            return '"' . addslashes($value) . '"';
+        } else {
+            return (string)$value;
         }
     }
 }

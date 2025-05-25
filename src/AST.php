@@ -1,6 +1,7 @@
 <?php
 
 abstract class AstNode {};
+abstract class ExpressionNode extends AstNode {}
 
 class FunctionNode extends AstNode
 {
@@ -124,7 +125,8 @@ class VariableAssignment extends AstNode
     }
 }
 
-class LiteralNode extends AstNode
+
+class LiteralNode extends ExpressionNode
 {
     public $lit;
 
@@ -140,7 +142,7 @@ class LiteralNode extends AstNode
     }
 }
 
-class BinaryExpression extends AstNode
+class BinaryExpression extends ExpressionNode
 {
     public $left;
     public $right;
@@ -160,6 +162,41 @@ class BinaryExpression extends AstNode
     }
 }
 
+
+class BooleanExpression extends ExpressionNode
+{
+    public $left;
+    public $right;
+    public $operator;
+
+    public function __construct($left, $right, $operator)
+    {
+        $this->left = $left;
+        $this->right = $right;
+        $this->operator = $operator;
+    }
+
+    public function __toString()
+    {
+        return 'BooleanExpression(left=' . $this->left . ', right=' . $this->right . ', op=' . $this->operator . PHP_EOL;
+    }
+}
+
+class VariableNode extends AstNode
+{
+    public $name;
+
+    public function __construct($name)
+    {
+        $this->name = $name;
+    }
+
+    public function __toString()
+    {
+        return 'Variable(' . $this->name . ')' . PHP_EOL;
+    }
+}
+
 class IdentifierNode extends AstNode
 {
     public $ident;
@@ -173,5 +210,17 @@ class IdentifierNode extends AstNode
     {
         $str = 'Identifier(' . $this->ident . ')' . PHP_EOL;
         return $str;
+    }
+}
+
+class PrintfNode extends AstNode
+{
+    public $str;
+    public $fmt;
+
+    public function __construct($str, $fmt)
+    {
+        $this->str = $str;
+        $this->fmt = $fmt;
     }
 }
