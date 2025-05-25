@@ -1,10 +1,5 @@
-
-void  test(int x,int y)
+int counter(int x, int y)
 {
-}
-
-
-int main(int argv)
-{
-    return 0;
+    test(1,2);
+    othertest(1,2,3);
 }

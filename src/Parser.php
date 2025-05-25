@@ -1,6 +1,5 @@
 <?php
 
-
 class Parser
 {
     /**
@@ -25,14 +24,13 @@ class Parser
         $ctx = $this->pCtx;
         $is_func = false;
 
-        //print_r($ctx->current());
-        //echo(PHP_EOL);
-
         $return_type = null;
         $func_name = null;
-        $arguments = [];
+        $arguments = null;
 
-        if (in_array($ctx->current()->get_text(), TokenType::NATIVE_C_TY)) {
+        if (
+            in_array($ctx->current()->get_text(), TokenType::NATIVE_C_TY)
+        ) {
             $return_type = $ctx->current();
             $ctx->advance();
 
@@ -49,10 +47,8 @@ class Parser
             if ($ctx->current()->get_type() == TokenType::OPEN_PAREN) {
                 // it is a function, parse the arguments
                 $ctx->advance();
-
                 while ($ctx->current()->get_type()) {
                     if ($ctx->current()->get_type() == TokenType::COMMA) {
-                        print_r($ctx->current()->get_type());
                         $ctx->advance();
                         continue;
                     } else if ($ctx->current()->get_type() == TokenType::CLOSE_PAREN) {
@@ -61,17 +57,16 @@ class Parser
                     }
                     $argument_type = $ctx->current();
                     $txt = $argument_type->get_text();
-                    //echo(in_array($txt,TokenType::NATIVE_C_TY).PHP_EOL);
-                    if (!in_array($txt, TokenType::NATIVE_C_TY)) {
-                        //echo("ERR: Argument type must be native C type.".PHP_EOL);
-                        return;
+
+                    if (!in_array($txt, TokenType::NATIVE_C_TY) && !in_array($txt, TokenType::NATIVE_C_TY_PTR)) {
+                        return null;
                     }
 
                     $ctx->advance();
 
                     $argument_name = $ctx->current();
 
-                    if (!$argument_name->get_type() == TokenType::IDENT) {
+                    if ($argument_name->get_type() != TokenType::IDENT) {
                         echo ("ERR: Argument name must be a valid identifier." . PHP_EOL);
                         return;
                     }
@@ -84,9 +79,6 @@ class Parser
                     $ctx->advance();
                 }
 
-                print_r(' Function: ' . $func_name . '  --- Has ret->' . $return_type->get_text() . "\t" . 'Has argument properties: ');
-                var_dump($arguments);
-                echo (PHP_EOL);
                 $is_func = true;
             } else {
                 // probably not
@@ -96,8 +88,66 @@ class Parser
 
         if (!$is_func) return;
 
-        //TODO: parse body
-        //TODO: parse ret stmt
+        $statements = [];
+        if ($ctx->current()->get_type() == TokenType::OPEN_CURLY_BRACE) {
+            $ctx->advance();
+            while ($ctx->current()->get_type() != TokenType::CLOSE_CURLY_BRACE) {
+                $statement = $this->parse_statement();
+
+                if ($statement) {
+                    $statements[] = $statement;
+                } else {
+                    $ctx->advance();
+                }
+            }
+        }
+
+        $function = new FunctionNode($func_name, $arguments, $statements, $return_type);
+        return $function;
+    }
+
+    public function parse_statement()
+    {
+        $ctx = $this->pCtx;
+        $parameters = [];
+
+        $curr = $ctx->current()->get_type();
+
+
+        // is it a function call?
+        if ($curr == TokenType::IDENT) {
+            $possible_func_name = $ctx->current()->get_text();
+
+            $ctx->advance();
+            $curr = $ctx->current()->get_type();
+
+            //func(x,y,z);
+            //    ^ we are here
+            if ($curr == TokenType::OPEN_PAREN) {
+                $ctx->advance();
+
+                while ($ctx->current()->get_type() != TokenType::CLOSE_PAREN) {
+
+                    if ($ctx->current()->get_type() == TokenType::COMMA) {
+                        $ctx->advance();
+                        continue;
+                    }
+
+                    $parameters[] = $ctx->current()->get_text();
+                    $ctx->advance();
+                }
+                $ctx->advance();
+                if (!($ctx->expect(';'))) {
+                    echo ("ERR: call must end with a semicolon ';'." . PHP_EOL);
+                    return null;
+                }
+            }
+
+            $func_call_statement = new FunctionCallNode($possible_func_name, $parameters);
+            return $func_call_statement;
+        } else {
+            return;
+        }
     }
 
     public function parse_tokens()
@@ -106,7 +156,6 @@ class Parser
         $ctx = $this->get_parser_context();
         $tokens_arr = $ctx->get_tokens();
         $node_arr = array();
-        //print_r($ctx->get_tokens());
         while ($ctx->current()) {
             $node = $this->parse_function();
             if ($node) {
@@ -153,12 +202,10 @@ class ParserContext
         $t_line_no = $peek->get_line_no();
 
         if (!$peek) {
-            //echo ("!! ERR !! Unkown token " . $p_ty . " on line: " . strval($t_line_no) . PHP_EOL);
             return false;
         }
 
         if ($p_ty != $tty) {
-            //echo("!! ERR !! Expected " . $token . ' but got: '. $tty . ' instead.' . PHP_EOL);
             return false;
         } else {
             $this->advance();

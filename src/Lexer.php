@@ -37,7 +37,9 @@ class TokenType
     const VOID_TYPE = 'VOID_TYPE';
     const DOUBLE_PTR_TYPE = 'DOUBLE_PTR_TYPE';
     const VOID_PTR = 'VOID_PTR';
+
     const NATIVE_C_TY = ['bool', 'int', 'char', 'long', 'double', 'float', 'void'];
+    const NATIVE_C_TY_PTR = ['bool*', 'int*', 'char*', 'long*', 'double*', 'float*', 'void*'];
 
     // arithmetic
     const ADD = 'ADD';
@@ -81,6 +83,7 @@ class Token
         return $this->type;
     }
 }
+
 class Lexer
 {
     private $pos = 0;
@@ -217,12 +220,13 @@ class Lexer
 
                     $frwrd = $next + 1;
                     $ty_str = $ty_match[1];
+                    $before = $next;
 
                     if ($this->next_slot_open($src, $next)) {
+                        $back = $src[$before];
                         $p_ptr = $src[$frwrd];
 
-                        if ($p_ptr === "*") {
-
+                        if ($p_ptr === "*" || $back === "*") {
                             $ty_str .= '*';
                             $pos = $next;
 
