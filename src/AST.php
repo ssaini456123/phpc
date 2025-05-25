@@ -90,19 +90,36 @@ class VariableDeclarationNode extends AstNode
 {
     public $variable_name;
     public $type;
-    public $value;
 
-    public function __construct($type, $varname, $value)
+    public function __construct($type, $varname)
     {
         $this->variable_name = $varname;
         $this->type = $type;
-        $this->value = $value;
     }
 
     public function __toString()
     {
         $str = "";
         $str .= 'Var(name=' . $this->variable_name . ', type=' . $this->type . ')' . PHP_EOL;
+        return $str;
+    }
+}
+
+class VariableAssignment extends AstNode
+{
+    public $variable_name;
+    public $value;
+
+    public function __construct($varname, $value)
+    {
+        $this->variable_name = $varname;
+        $this->value = $value;
+    }
+
+    public function __toString()
+    {
+        $str = "";
+        $str .= 'Reassignment(name=' . $this->variable_name . ', value=' . $this->value . ')' . PHP_EOL;
         return $str;
     }
 }

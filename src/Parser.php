@@ -1,16 +1,21 @@
 <?php
 
+include("SymbolTable.php");
+
+
 class Parser
 {
     /**
      * @var ParserContext
      */
     private $pCtx;
+    private $symbol_table;
 
     public function __construct($tok_arr)
     {
         $toks = $tok_arr;
         $this->pCtx = new ParserContext(0, $toks);
+        $this->symbol_table = new SymbolTable();
     }
 
     public function get_parser_context()
@@ -103,6 +108,7 @@ class Parser
         }
 
         $function = new FunctionNode($func_name, $arguments, $statements, $return_type);
+        print_r($function);
         return $function;
     }
 
@@ -141,8 +147,36 @@ class Parser
                 }
 
                 $func_call_statement = new FunctionCallNode($possible_func_name, $parameters);
-                print_r($func_call_statement);
                 return $func_call_statement;
+            }
+
+
+            $var_name = $possible_func_name;
+            if ($curr == TokenType::EQUAL) {
+                $ctx->advance();
+                $value = $ctx->current()->get_text();
+                $exists = $this->symbol_table->lookup($var_name);
+                if (!$exists) {
+                    echo ("ERR: Variable must be declared before assignment.");
+                    return null;
+                } else {
+                    $this->symbol_table->store($var_name, $value);
+                    $var_assignment_node = new VariableAssignment($var_name, $value);
+                    return $var_assignment_node;
+                }
+            }
+        } else if (in_array($ctx->current()->get_text(), TokenType::NATIVE_C_TY)) {
+            $type = $ctx->current()->get_text();
+            $ctx->advance();
+            $var_name = $ctx->current()->get_text();
+            $ctx->advance();
+            if ($ctx->expect(';')) {
+                $this->symbol_table->store($var_name, null);
+                print_r($this->symbol_table);
+                return new VariableDeclarationNode($type, $var_name);
+            } else {
+                echo ("ERR: Improper variable declaration");
+                return null;
             }
         }
     }

@@ -37,6 +37,7 @@ class TokenType
     const VOID_TYPE = 'VOID_TYPE';
     const DOUBLE_PTR_TYPE = 'DOUBLE_PTR_TYPE';
     const VOID_PTR = 'VOID_PTR';
+    const EQUAL = 'EQUAL';
 
     const NATIVE_C_TY = ['bool', 'int', 'char', 'long', 'double', 'float', 'void'];
     const NATIVE_C_TY_PTR = ['bool*', 'int*', 'char*', 'long*', 'double*', 'float*', 'void*'];
@@ -342,6 +343,10 @@ class Lexer
                     break;
                 case ',':
                     $this->tokens[] = new Token(TokenType::COMMA, ',', $pos, $lineNo);
+                    $pos++;
+                    break;
+                case '=':
+                    $this->tokens[] = new Token(TokenType::EQUAL, '=', $pos, $lineNo);
                     $pos++;
                     break;
                 default:
