@@ -1,3 +1,8 @@
+(defun f ()
+  (let ((x 5) (y x) (z x))
+  z)
+)
+
 (defun test ()
   (format t "\"                                                                                \\n\"" )
   (format t "\"                           #######                                                 \\n\"" )
@@ -46,6 +51,7 @@
   (format t "\" *******\\n\"" )
   (format t "\"*********\\n\"" )
   (test )
+  (f )
   0
 )
 

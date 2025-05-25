@@ -1,4 +1,17 @@
 
+int f()
+{
+    int x;
+    int y;
+    int z;
+
+    x = 5 - 3;
+    y = x - 9;
+    z = x + y - x;
+
+    return z;
+}
+
 void test()
 {
     printf("                                                                                \n");
@@ -50,5 +63,6 @@ int main()
     printf("*********\n");
 
     test();
+    f();
     return 0;
 }
