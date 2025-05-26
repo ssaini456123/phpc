@@ -47,7 +47,7 @@ class BlockNode extends AstNode
     }
 }
 
-class FunctionCallNode extends AstNode
+class FunctionCallNode extends ExpressionNode
 {
     public $func_name;
     public $call_args;
@@ -178,11 +178,11 @@ class BooleanExpression extends ExpressionNode
 
     public function __toString()
     {
-        return 'BooleanExpression(left=' . $this->left . ', right=' . $this->right . ', op=' . $this->operator . PHP_EOL;
+        return 'BooleanExpression(left=' . $this->left . ', right=' . $this->right . ', op=' . $this->operator . ')' . PHP_EOL;
     }
 }
 
-class VariableNode extends AstNode
+class VariableNode extends ExpressionNode
 {
     public $name;
 
@@ -193,11 +193,11 @@ class VariableNode extends AstNode
 
     public function __toString()
     {
-        return 'Variable(' . $this->name . ')' . PHP_EOL;
+        return $this->name;
     }
 }
 
-class IdentifierNode extends AstNode
+class IdentifierNode extends ExpressionNode
 {
     public $ident;
 
@@ -222,5 +222,17 @@ class PrintfNode extends AstNode
     {
         $this->str = $str;
         $this->fmt = $fmt;
+    }
+}
+
+class UnaryExpression extends ExpressionNode
+{
+    public $operation;
+    public $operand;
+
+    public function __construct($op, $operand)
+    {
+        $this->operation = $op;
+        $this->operand = $operand;
     }
 }

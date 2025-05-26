@@ -108,6 +108,7 @@ class Parser
         }
 
         $function = new FunctionNode($func_name, $arguments, $statements, $return_type);
+        print_r($function);
         return $function;
     }
 
@@ -122,25 +123,14 @@ class Parser
         if ($ctx->current()->get_text() == 'return') {
 
             $ctx->advance();
-            $tok = $ctx->current();
-            $ctx->advance();
+            $node = $this->parse_expression();
 
-            $semi = $ctx->expect(';');
-            if ($semi) {
-                // determine if retval is a literla or a symbolic
-                if ($tok->get_type() == TokenType::NUMERICAL || $tok->get_type() == TokenType::STRING_LIT) {
-                    $literalNode = new LiteralNode($tok->get_text());
-                    $retval = new ReturnNode($literalNode);
-                    return $retval;
-                } else {
-                    $identifierNode = new IdentifierNode($tok);
-                    $retval = new ReturnNode($identifierNode);
-                    return $retval;
-                }
-            } else {
-                echo ("Return statement must end with a semi colon ';'.");
+            if (!$ctx->expect(';')) {
+                echo ("Return statement must end with semiclon!");
                 return null;
             }
+
+            return new ReturnNode($node);
         }
 
         if ($curr == TokenType::IDENT) {
@@ -162,8 +152,9 @@ class Parser
                         continue;
                     }
 
-                    $parameters[] = $ctx->current()->get_text();
-                    $ctx->advance();
+                    $expr = $this->parse_expression();
+
+                    $parameters[] = $expr;
                 }
                 $ctx->advance();
                 if (!($ctx->expect(';'))) {
@@ -178,20 +169,24 @@ class Parser
                 }
                 return $func_call_statement;
             }
-
-
             $var_name = $possible_func_name;
             if ($curr == TokenType::EQUAL) {
                 $ctx->advance();
-                $value = $ctx->current()->get_text();
+                $expression = $this->parse_expression();
+
+
+                if (!$ctx->expect(';')) {
+                    echo ("ERR: Assignment must end with ';'.");
+                    return null;
+                }
+
                 $exists = $this->symbol_table->lookup($var_name);
                 if (!$exists) {
                     echo ("ERR: Variable must be declared before assignment.");
                     return null;
                 } else {
-                    $this->symbol_table->store($var_name, $value);
-                    $var_assignment_node = new VariableAssignment($var_name, $value);
-                    return $var_assignment_node;
+                    $this->symbol_table->store($var_name, $expression);
+                    return new VariableAssignment($var_name, $expression);
                 }
             }
         } else if (in_array($ctx->current()->get_text(), TokenType::NATIVE_C_TY)) {
@@ -204,6 +199,70 @@ class Parser
                 return new VariableDeclarationNode($type, $var_name);
             } else {
                 echo ("ERR: Improper variable declaration");
+                return null;
+            }
+        }
+    }
+
+    public function parse_expression()
+    {
+        $ctx = $this->pCtx;
+        $node = $this->parse_term();
+        while (
+            $ctx->current()->get_type() == TokenType::ADD
+            || $ctx->current()->get_type() == TokenType::SUBTRACT
+        ) {
+            $op = $ctx->current()->get_text();
+            $ctx->advance();
+            $rhs = $this->parse_term();
+            $node = new BinaryExpression($node, $rhs, $op);;
+        }
+        return $node;
+    }
+
+    public function parse_term()
+    {
+        $ctx = $this->pCtx;
+        $curr = $ctx->current();
+        $node = $this->parse_factor();
+        while (
+            $ctx->current()->get_type() == TokenType::MULTIPLY ||
+            $ctx->current()->get_type() == TokenType::DIVIDE
+        ) {
+            $op = $ctx->current()->get_text();
+            $ctx->advance();
+            $rhs  = $this->parse_factor();
+            $node = new BinaryExpression($node, $rhs, $op);
+        }
+
+        return $node;
+    }
+
+    public function parse_factor()
+    {
+        $ctx = $this->pCtx;
+        $current = $ctx->current();
+
+        if (
+            $ctx->current()->get_type() == TokenType::NUMERICAL ||
+            $ctx->current()->get_type() == TokenType::STRING_LIT
+        ) {
+            $txt = $ctx->current()->get_text();
+            $ctx->advance();
+            return new LiteralNode($txt);
+        } elseif ($current->get_type() == TokenType::IDENT) {
+            $txt = $ctx->current()->get_text();
+            $ctx->advance();
+            return new VariableNode($txt);
+        } elseif ($current->get_type() == TokenType::OPEN_PAREN) {
+            $ctx->advance();
+            $node = $this->parse_expression();
+            $exists = $ctx->expect(')');
+
+            if ($exists) {
+                return $node;
+            } else {
+                echo ("Expected ')'." . PHP_EOL);
                 return null;
             }
         }
@@ -233,85 +292,114 @@ class Parser
 
         file_put_contents('output.lisp', $lisp_output);
     }
-
     public function generate_lisp_code($node)
     {
         if ($node instanceof FunctionNode) {
-            $args = array_map(fn($arg) => $arg['name'], $node->arguments ?? []);
-            $body = [];
+            // map arguments
+            $args = array_map(function ($arg) {
+                return $arg['name'];
+            }, $node->arguments ?? []);
 
+            $bodyForms = [];
             // To collect let bindings
-            $let_bindings = [];
+            $letBindings = [];
 
             foreach ($node->statements as $stmt) {
                 if ($stmt instanceof VariableDeclarationNode) {
-                    $let_bindings[] = [$stmt->variable_name, 'nil'];
+                    $letBindings[$stmt->variable_name] = 'nil';
                 } elseif ($stmt instanceof VariableAssignment) {
-                    // Check if it's already declared in let
-                    $already_declared = false;
-                    foreach ($let_bindings as &$bind) {
-                        if ($bind[0] === $stmt->variable_name) {
-                            $bind[1] = self::value_to_lisp($stmt->value);
-                            $already_declared = true;
-                            break;
-                        }
-                    }
-                    if (!$already_declared) {
-                        $body[] = "(setf {$stmt->variable_name} " . self::value_to_lisp($stmt->value) . ")";
+                    // handle AST nodes correctly
+                    $val = $this->value_to_lisp($stmt->value);
+                    if (array_key_exists($stmt->variable_name, $letBindings)) {
+                        $letBindings[$stmt->variable_name] = $val;
+                    } else {
+                        $bodyForms[] = "(setf {$stmt->variable_name} $val)";
                     }
                 } else {
-                    $body[] = self::generate_lisp_code($stmt);
+                    $bodyForms[] = $this->generate_lisp_code($stmt);
                 }
             }
 
+            $bodyStr = implode("\n  ", $bodyForms);
 
-            $body_str = implode("\n  ", $body);
-            if (!empty($let_bindings)) {
-                $bindings_str = implode(' ', array_map(fn($b) => "({$b[0]} {$b[1]})", $let_bindings));
-                $body_str = "(let ($bindings_str)\n  $body_str)";
+            if (!empty($letBindings)) {
+                // "(name init)" strings
+                $bindingPairs = array_map(
+                    function ($name, $init) {
+                        return "({$name} {$init})";
+                    },
+                    array_keys($letBindings),
+                    array_values($letBindings)
+                );
+                $bindingsStr = implode(' ', $bindingPairs);
+                $bodyStr      = "(let ({$bindingsStr})\n  {$bodyStr})";
             }
 
-            $s = "(defun {$node->func_name} (" . implode(' ', $args) . ")\n  $body_str\n)";
-            if (strlen($bindings_str) > 0) {
-
-                return $s;
-            } else {
-                return $s;
-            }
+            $argsStr = implode(' ', $args);
+            return "(defun {$node->func_name} ({$argsStr})\n  {$bodyStr}\n)";
         } elseif ($node instanceof FunctionCallNode) {
-            $args_str = implode(' ', array_map(fn($a) => self::value_to_lisp($a), $node->call_args ?? []));
-            return "({$node->func_name} $args_str)";
+            $args = '';
+            if (!empty($node->call_args)) {
+                $lispArgs = array_map(function ($a) {
+                    return $this->value_to_lisp($a);
+                }, $node->call_args);
+                $args = ' ' . implode(' ', $lispArgs);
+            }
+            return "({$node->func_name}{$args})";
         } elseif ($node instanceof PrintfNode) {
-            $fmt = self::value_to_lisp($node->fmt[0]);
-            $args = array_slice($node->fmt, 1);
-            $args_str = implode(' ', array_map(fn($a) => self::value_to_lisp($a), $args));
-            return "(format t $fmt $args_str)";
+            $fmt      = $this->value_to_lisp($node->fmt[0]);
+            $rest     = array_slice($node->fmt, 1);
+            $lispArgs = array_map(function ($a) {
+                return $this->value_to_lisp($a);
+            }, $rest);
+            $argsStr  = $lispArgs ? ' ' . implode(' ', $lispArgs) : '';
+            return "(format t \"~A~%\" {$fmt})";
         } elseif ($node instanceof ReturnNode) {
-            return self::generate_lisp_code($node->retval);
+            return $this->generate_lisp_code($node->retval);
         } elseif ($node instanceof IdentifierNode) {
             return $node->ident->get_text();
         } elseif ($node instanceof LiteralNode) {
-            return self::value_to_lisp($node->lit);
+            return $this->value_to_lisp($node);
         }
 
-        return "";
+        return '';
     }
 
-    private static function value_to_lisp($value)
+    private function value_to_lisp($value)
     {
+
+        if ($value instanceof LiteralNode) {
+            return $value->lit;
+        }
+
+        if ($value instanceof IdentifierNode) {
+            $v = $value->ident->get_text();
+            return $v;
+        }
+
+        if (
+            $value instanceof FunctionCallNode ||
+            $value instanceof PrintfNode      ||
+            $value instanceof ReturnNode      ||
+            $value instanceof BinaryExpression
+        ) {
+            return $this->generate_lisp_code($value);
+        }
+
+        // plain PHP values
         if (is_numeric($value)) {
             return $value;
         } elseif (is_string($value)) {
             return '"' . addslashes($value) . '"';
-        } else {
-            return (string)$value;
         }
+
+        return (string)$value;
     }
 }
 
 class ParserContext
 {
-    private int $pos;
+    private $pos;
     private $tokens;
 
     public function __construct($pos, $tokens)
